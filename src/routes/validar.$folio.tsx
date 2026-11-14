@@ -1,0 +1,10 @@
+import { createFileRoute, Link } from '@tanstack/react-router';
+import { useEffect, useState } from 'react';
+import { ShieldCheck, ShieldX, ArrowLeft } from 'lucide-react';
+import { PortalShell } from '@/components/portal';
+import { Button } from '@/components/ui/button';
+import { findCertificate, formatDate, type Certificate } from '@/lib/events';
+import { IS_MOCK_MODE } from '@/lib/firebase';
+import { pageHead } from '@/lib/head';
+export const Route=createFileRoute('/validar/$folio')({head:()=>pageHead('Verificar constancia','Comprueba la autenticidad de una constancia de participación emitida por Contactus.'),component:Validation});
+function Validation(){const {folio}=Route.useParams();const [cert,setCert]=useState<Certificate>();const [loading,setLoading]=useState(true);const [error,setError]=useState('');useEffect(()=>{setLoading(true);findCertificate(folio).then(setCert).catch(()=>setError('No fue posible consultar la constancia. Intenta de nuevo.')).finally(()=>setLoading(false));},[folio]);return <PortalShell><section className="validation-panel">{loading?<div className="loading">Verificando constancia…</div>:<><div className={`validation-icon ${cert?'':'invalid'}`}>{cert?<ShieldCheck size={38}/>:<ShieldX size={38}/>}</div><h1>{cert?'Constancia Auténtica y Verificada':error?'Verificación no disponible':'Folio no válido'}</h1>{cert?<><p className="subtitle text-center">El registro de esta constancia ha sido confirmado.</p><dl><dt>Participante</dt><dd>{cert.nombre}</dd><dt>Curso acreditado</dt><dd>{cert.curso}</dd><dt>Fecha de emisión</dt><dd>{formatDate(cert.fecha)}</dd><dt>Duración</dt><dd>{cert.horas} horas</dd><dt>Folio único</dt><dd>{cert.folio}</dd></dl></>:<p className="subtitle text-center">{error||'No encontramos una constancia asociada a este folio.'}</p>}{IS_MOCK_MODE&&<div className="notice mt-6">Demostración local: solo se pueden verificar constancias creadas en este navegador. La verificación compartida requiere Firebase configurado.</div>}<Button variant="outline" asChild className="mt-6 w-full"><Link to="/"><ArrowLeft/>Volver al portal</Link></Button></>}</section></PortalShell>}

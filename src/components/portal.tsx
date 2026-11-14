@@ -1,0 +1,5 @@
+import { Link, useLocation } from '@tanstack/react-router';
+import { LayoutGrid, LockKeyhole, ArrowUpRight, CheckCircle2, XCircle } from 'lucide-react';
+import type { ReactNode } from 'react';
+export function PortalShell({children}: {children:ReactNode}) { const path=useLocation({select:l=>l.pathname});return <><header className="site-header"><div className="app-shell header-inner"><Link to="/" className="brand">Contactus</Link><nav className="main-nav"><Link to="/" className={`nav-link ${path==='/'?'active':''}`}><LayoutGrid size={15}/>Portal de participantes</Link><Link to="/admin" className={`nav-link ${path==='/admin'?'active':''}`}><LockKeyhole size={14}/>Administración<ArrowUpRight size={13}/></Link></nav></div></header><main className="app-shell">{children}</main></>}
+export function Feedback({message,error=false}:{message:string;error?:boolean}){if(!message)return null;const Icon=error?XCircle:CheckCircle2;return <div role={error?'alert':'status'} className={`feedback ${error?'error':''}`}><Icon/><span>{message}</span></div>}

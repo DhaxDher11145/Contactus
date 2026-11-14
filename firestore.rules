@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  // Replace the UID in Firebase Console after creating the sole admin account.
+  function admin() { return request.auth != null && request.auth.uid == 'REPLACE_WITH_ADMIN_UID'; }
+  function participant(email) { return get(/databases/$(database)/documents/participantes/$(email)).data; }
+  match /cursos/{id} { allow read: if true; allow write: if admin(); }
+  match /pines/{id} { allow read, write: if admin(); }
+  match /configuracion/plantilla { allow read: if true; allow write: if admin(); }
+  match /participantes/{id} {
+   allow get: if true;
+   allow list, update, delete: if admin();
+   allow create: if request.resource.data.keys().hasOnly(['id','nombre','email','telefono']) && request.resource.data.id == id && request.resource.data.email == id && request.resource.data.email is string && request.resource.data.nombre is string && request.resource.data.nombre.size() >= 3 && request.resource.data.nombre.size() <= 120 && request.resource.data.telefono is string;
+  }
+  match /asistencias/{id} {
+   // Existing attendance documents contain PINs and must never be publicly readable.
+   allow get: if admin() || !exists(/databases/$(database)/documents/asistencias/$(id));
+   allow list, update, delete: if admin();
+   allow create: if admin() || (
+    request.resource.data.keys().hasOnly(['email','cursoId','pin','folio']) &&
+    id == request.resource.data.cursoId + '_' + request.resource.data.email &&
+    get(/databases/$(database)/documents/cursos/$(request.resource.data.cursoId)).data.asistenciaAbierta == true &&
+    request.resource.data.pin == get(/databases/$(database)/documents/pines/$(request.resource.data.cursoId)).data.pin &&
+    exists(/databases/$(database)/documents/participantes/$(request.resource.data.email)) &&
+    getAfter(/databases/$(database)/documents/constancias/$(request.resource.data.folio)).data.email == request.resource.data.email
+   );
+  }
+  match /constancias/{folio} {
+   allow get: if true;
+   // Email search is public by product requirement; certificate data is not confidential.
+   allow list: if true;
+   allow update, delete: if admin();
+   allow create: if admin() || (
+    request.resource.data.keys().hasOnly(['id','folio','participanteId','email','nombre','cursoId','curso','fecha','horas']) &&
+    request.resource.data.folio == folio && request.resource.data.id == folio &&
+    request.resource.data.participanteId == request.resource.data.email &&
+    request.resource.data.nombre == get(/databases/$(database)/documents/participantes/$(request.resource.data.email)).data.nombre &&
+    request.resource.data.curso == get(/databases/$(database)/documents/cursos/$(request.resource.data.cursoId)).data.nombre &&
+    request.resource.data.horas == get(/databases/$(database)/documents/cursos/$(request.resource.data.cursoId)).data.horas &&
+    !exists(/databases/$(database)/documents/asistencias/$(request.resource.data.cursoId + '_' + request.resource.data.email)) &&
+    getAfter(/databases/$(database)/documents/asistencias/$(request.resource.data.cursoId + '_' + request.resource.data.email)).data.folio == folio
+   );
+  }
+ }
+}
