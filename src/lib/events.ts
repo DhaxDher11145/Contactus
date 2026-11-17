@@ -213,13 +213,14 @@ function makeCertificate(person: Participant, course: Course): Certificate {
 
 export async function markAttendance(email: string, courseId: string, pin: string) {
   const normalized = normalizeEmail(email);
+  const cleanPin = pin.trim();
   let cert: Certificate;
 
   if (IS_MOCK_MODE) {
     const data = read();
     const person = data.participantes.find((p) => p.email === normalized);
     const course = data.cursos.find((c) => c.id === courseId);
-    assertAttendance(person, course, pin, data.pins[courseId] ?? '');
+    assertAttendance(person, course, cleanPin, data.pins[courseId] ?? '');
     if (!person || !course) throw new Error('Datos incompletos.');
     if (data.constancias.some((c) => c.email === normalized && c.cursoId === courseId)) {
       throw new Error('Tu asistencia ya está registrada para este curso.');
@@ -234,6 +235,7 @@ export async function markAttendance(email: string, courseId: string, pin: strin
   cert = await runTransaction(db, async (tx) => {
     const p = await tx.get(doc(db, 'participantes', participantId(email)));
     const c = await tx.get(doc(db, 'cursos', courseId));
+    const pinSnap = await tx.get(doc(db, 'pines', courseId));
     const attendanceRef = doc(db, 'asistencias', `${courseId}_${participantId(email)}`);
     const previous = await tx.get(attendanceRef);
 
@@ -242,15 +244,22 @@ export async function markAttendance(email: string, courseId: string, pin: strin
       throw new Error('El pase de lista de este curso está cerrado.');
     }
     if (previous.exists()) throw new Error('Tu asistencia ya está registrada para este curso.');
-    if (!validPin(pin)) throw new Error('El PIN debe tener 4 dígitos.');
+    if (!validPin(cleanPin)) throw new Error('El PIN debe tener 4 dígitos.');
+
+    const expectedPin = pinSnap.exists() ? String(pinSnap.data()['pin'] ?? '') : '';
+    if (expectedPin && cleanPin !== expectedPin) {
+      throw new Error('El PIN de asistencia no es correcto.');
+    }
 
     const result = makeCertificate(p.data() as Participant, { ...c.data(), id: c.id } as Course);
-    tx.set(attendanceRef, { email: normalized, cursoId, pin, folio: result.folio });
+    tx.set(attendanceRef, {
+      email: normalized,
+      cursoId: courseId,
+      pin: cleanPin,
+      folio: result.folio,
+    });
     tx.set(doc(db, 'constancias', result.folio), result);
     return result;
-  }).catch((err) => {
-    if (err instanceof Error && err.message) throw err;
-    throw new Error('No se pudo registrar. Verifica el PIN y que tu asistencia no esté registrada.');
   });
 
   return cert;
