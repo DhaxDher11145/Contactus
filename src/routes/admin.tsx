@@ -1,32 +1,755 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { Plus, LogOut, BookOpen, Users, SlidersHorizontal, LockKeyhole, Download, Award, Search, Printer, CalendarDays, Clock3 } from 'lucide-react';
+import {
+  Plus,
+  LogOut,
+  BookOpen,
+  Users,
+  LockKeyhole,
+  Download,
+  Award,
+  Search,
+  Printer,
+  CalendarDays,
+  Clock3,
+  Pencil,
+  FileText,
+  Save,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { PortalShell, Feedback } from '@/components/portal';
 import { Calibrator } from '@/components/calibrator';
 import { pageHead } from '@/lib/head';
 import { IS_MOCK_MODE, firebaseServices } from '@/lib/firebase';
-import { watchCourses, saveCourse, adminParticipants, adminCertificates, assignCertificate, formatDate, type Course, type Participant, type Certificate } from '@/lib/events';
+import {
+  watchCourses,
+  saveCourse,
+  adminParticipants,
+  adminCertificates,
+  assignCertificate,
+  formatDate,
+  defaultTemplate,
+  templateFrom,
+  type Course,
+  type Participant,
+  type Certificate,
+  type Template,
+} from '@/lib/events';
 import { downloadCertificate, createCertificatePdf, downloadFile } from '@/lib/certificates';
-export const Route=createFileRoute('/admin')({head:()=>pageHead('Administración','Gestiona cursos, asistencia, participantes y el diseño de tus constancias.'),component:Admin});
-function Admin(){const [user,setUser]=useState(false);const [ready,setReady]=useState(IS_MOCK_MODE);const [busy,setBusy]=useState(false);const [message,setMessage]=useState('');const [error,setError]=useState(false);const [tab,setTab]=useState(0);const [courses,setCourses]=useState<Course[]>([]);const [people,setPeople]=useState<Participant[]>([]);const [certs,setCerts]=useState<Certificate[]>([]);const [search,setSearch]=useState('');const [filter,setFilter]=useState('');const [creating,setCreating]=useState(false);const [assignId,setAssignId]=useState('');const [assignCourse,setAssignCourse]=useState('');
- useEffect(()=>{if(IS_MOCK_MODE)return;return onAuthStateChanged(firebaseServices().auth,u=>{setUser(!!u);setReady(true);if(!u){setPeople([]);setCerts([]);setCourses([]);}});},[]);
- useEffect(()=>{if(!user)return;return watchCourses(setCourses);},[user]);
- async function refresh(){const [p,c]=await Promise.all([adminParticipants(),adminCertificates()]);setPeople(p);setCerts(c);}
- useEffect(()=>{if(user)refresh().catch(()=>{setError(true);setMessage('No fue posible consultar los participantes. Revisa los permisos de Firebase.');});},[user]);
- async function run(action:()=>Promise<unknown>,success=''){setBusy(true);setMessage('');setError(false);try{await action();if(success)setMessage(success);}catch(e){setError(true);setMessage(e instanceof Error?e.message:'No fue posible completar la operación.');}finally{setBusy(false);}}
- async function login(e:FormEvent<HTMLFormElement>){e.preventDefault();const data=new FormData(e.currentTarget);await run(async()=>{await signInWithEmailAndPassword(firebaseServices().auth,String(data.get('email')),String(data.get('password')));},'');}
- async function createCourse(e:FormEvent<HTMLFormElement>){e.preventDefault();const form=e.currentTarget;const data=new FormData(form);await run(async()=>{await saveCourse({id:crypto.randomUUID(),nombre:String(data.get('nombre')).trim(),fecha:String(data.get('fecha')),horas:Number(data.get('horas')),asistenciaAbierta:false},String(data.get('pin')));setCreating(false);},'Curso creado. Abre el pase de lista cuando comience la sesión.');}
- const filtered=people.filter(p=>(`${p.nombre} ${p.email} ${p.telefono}`).toLowerCase().includes(search.toLowerCase())&&(!filter||certs.some(c=>c.participanteId===p.id&&c.cursoId===filter)));
- function exportCsv(){const cell=(value:unknown)=>`"${String(value).replaceAll('"','""').replace(/^[=+@-]/,"'$&")}"`;const rows=[['Nombre','Correo','Teléfono/Matrícula','Curso','Folio','Fecha']];for(const p of filtered){const matching=certs.filter(c=>c.participanteId===p.id&&(!filter||c.cursoId===filter));if(matching.length)matching.forEach(c=>rows.push([p.nombre,p.email,p.telefono,c.curso,c.folio,formatDate(c.fecha)]));else rows.push([p.nombre,p.email,p.telefono,'','','']);}downloadFile('\uFEFF'+rows.map(row=>row.map(cell).join(',')).join('\r\n'),'participantes.csv','text/csv;charset=utf-8');}
- async function printCertificate(cert:Certificate){const popup=window.open('','_blank');if(!popup)throw new Error('Permite ventanas emergentes para imprimir.');try{const bytes=await createCertificatePdf(cert);const url=URL.createObjectURL(new Blob([new Uint8Array(bytes)],{type:'application/pdf'}));popup.location.href=url;setTimeout(()=>{popup.print();URL.revokeObjectURL(url);},1500);}catch(e){popup.close();throw e;}}
- if(!ready)return <PortalShell><div className="loading">Comprobando acceso…</div></PortalShell>;
- if(!user)return <PortalShell><section className="form-panel login-panel"><div className="panel-heading"><div className="heading-icon"><LockKeyhole/></div><div><h2>Acceso de administración</h2><p>Gestión de cursos y constancias</p></div></div><div className="form-body"><Feedback message={message} error={error}/>{IS_MOCK_MODE?<><div className="notice">Modo demostración. Este acceso permite explorar datos locales; no es una sesión de administrador real.</div><Button className="submit-button" onClick={()=>setUser(true)}>Explorar panel de demostración<ArrowRightIcon/></Button><p className="field-hint mt-4">El acceso con correo y contraseña estará disponible al configurar Firebase Auth.</p></>:<form onSubmit={login}><label className="field"><span className="field-label">Correo electrónico</span><input type="email" name="email" className="text-input" autoComplete="username" required/></label><label className="field"><span className="field-label">Contraseña</span><input type="password" name="password" className="text-input" autoComplete="current-password" required/></label><Button className="submit-button" disabled={busy} type="submit">{busy?'Ingresando…':'Iniciar sesión'}<LockKeyhole/></Button></form>}</div></section></PortalShell>;
- return <PortalShell><div className="page-intro"><div><div className="eyebrow">CENTRO DE GESTIÓN</div><h1 className="page-title">Administración</h1><p className="subtitle">Todo lo que necesitas para reconocer la participación.</p></div><Button variant="outline" onClick={()=>run(async()=>{if(!IS_MOCK_MODE)await signOut(firebaseServices().auth);setUser(false);setPeople([]);setCerts([]);setMessage('');})}><LogOut/>Salir</Button></div><div className="admin-tabs">{[{label:'Cursos y Asistencia',icon:BookOpen},{label:'Participantes y Constancias',icon:Users},{label:'Diseño y Calibrador',icon:SlidersHorizontal}].map((t,i)=><Button key={t.label} variant="outline" className={tab===i?'selected':''} onClick={()=>{setTab(i);setMessage('');}}><t.icon/>{t.label}</Button>)}</div><Feedback message={message} error={error}/>
- {tab===0&&<><div className="admin-tools"><span className="subtitle">{courses.length} cursos registrados</span><Button className="ml-auto" onClick={()=>setCreating(!creating)}><Plus/>{creating?'Cancelar':'Nuevo curso'}</Button></div>{creating&&<section className="form-panel mb-6"><div className="form-body"><h2 className="text-xl mb-5">Nuevo curso</h2><form onSubmit={createCourse}><div className="admin-grid"><label className="field"><span className="field-label">Nombre del curso</span><input className="text-input" name="nombre" minLength={3} maxLength={150} required/></label><label className="field"><span className="field-label">Fecha</span><input className="text-input" name="fecha" type="date" required/></label><label className="field"><span className="field-label">Horas de duración</span><input className="text-input" name="horas" type="number" min="0.5" max="1000" step="0.5" required/></label><label className="field"><span className="field-label">PIN de asistencia · 4 dígitos</span><input className="text-input" name="pin" type="password" pattern="[0-9]{4}" maxLength={4} inputMode="numeric" required/></label></div><Button disabled={busy} type="submit"><Plus/>Crear curso</Button></form></div></section>}<div className="admin-grid mb-10">{courses.map(c=><article key={c.id} className="admin-course"><h3>{c.nombre}</h3><div className="course-meta"><span><CalendarDays/>{formatDate(c.fecha)}</span><span><Clock3/>{c.horas} horas</span></div><div className="admin-course-footer"><span className={`status ${c.asistenciaAbierta?'':'closed'}`}><span className="status-dot"/>{c.asistenciaAbierta?'Pase de lista abierto':'Pase de lista cerrado'}</span><Switch aria-label={`Abrir / Cerrar Pase de Lista: ${c.nombre}`} checked={c.asistenciaAbierta} disabled={busy} onCheckedChange={value=>run(()=>saveCourse({...c,asistenciaAbierta:value}),'Estado de asistencia actualizado.')}/></div></article>)}</div></>}
- {tab===1&&<><div className="admin-tools"><div className="input-wrap"><Search/><input aria-label="Buscar participantes" className="text-input" placeholder="Buscar por nombre o correo" value={search} onChange={e=>setSearch(e.target.value)}/></div><select aria-label="Filtrar por curso" className="text-input" value={filter} onChange={e=>setFilter(e.target.value)}><option value="">Todos los cursos</option>{courses.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}</select><Button variant="outline" className="ml-auto" onClick={exportCsv}><Download/>Exportar CSV</Button></div><div className="table-scroll mb-6"><table><thead><tr><th>Participante</th><th>Teléfono / Matrícula</th><th>Constancias</th><th>Acciones</th></tr></thead><tbody>{filtered.map(p=><tr key={p.id}><td>{p.nombre}<small>{p.email}</small></td><td>{p.telefono}</td><td>{certs.filter(c=>c.participanteId===p.id&&(!filter||c.cursoId===filter)).map(c=><div key={c.folio} className="mb-2">{c.curso}<div className="flex gap-1 mt-1"><Button variant="ghost" size="icon" title="Descargar PDF" aria-label={`Descargar PDF de ${p.nombre}`} onClick={()=>run(()=>downloadCertificate(c))}><Download/></Button><Button variant="ghost" size="icon" title="Imprimir constancia" aria-label={`Imprimir constancia de ${p.nombre}`} onClick={()=>run(()=>printCertificate(c))}><Printer/></Button></div></div>)}</td><td><Button variant="outline" size="sm" onClick={()=>{setAssignId(p.id);setAssignCourse(filter||courses[0]?.id||'');}}><Award/>Asignar</Button></td></tr>)}</tbody></table>{!filtered.length&&<div className="empty-state">No hay participantes que coincidan con tu búsqueda.</div>}</div><p className="field-hint mb-8">{filtered.length} participantes · {certs.length} constancias emitidas</p>{assignId&&<div role="dialog" aria-modal="true" aria-label="Asignar constancia" className="assignment-modal"><div className="form-panel assignment-content"><div className="form-body"><h2 className="text-xl mb-3">Asignar constancia</h2><p className="subtitle mb-5">{people.find(p=>p.id===assignId)?.nombre}</p><label className="field"><span className="field-label">Curso acreditado</span><select className="text-input" value={assignCourse} onChange={e=>setAssignCourse(e.target.value)}>{courses.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}</select></label><div className="flex gap-3"><Button disabled={busy||!assignCourse} onClick={()=>run(async()=>{const person=people.find(p=>p.id===assignId);const course=courses.find(c=>c.id===assignCourse);if(!person||!course)throw new Error('Selecciona un curso.');await assignCertificate(person,course);await refresh();setAssignId('');},'Constancia asignada correctamente.')}><Award/>Asignar constancia</Button><Button variant="outline" onClick={()=>setAssignId('')}>Cancelar</Button></div><Feedback message={message} error={error}/></div></div></div>}</>}
- {tab===2&&<div className="mb-10"><Calibrator/></div>}</PortalShell>;
+
+export const Route = createFileRoute('/admin')({
+  head: () =>
+    pageHead(
+      'Administración',
+      'Gestiona cursos, asistencia, participantes y el diseño de tus constancias.'
+    ),
+  component: Admin,
+});
+
+// Detecta automáticamente todos los PDFs colocados en public/plantillas/
+const detectedTemplateModules = import.meta.glob('/public/plantillas/*.pdf', {
+  query: '?url',
+  import: 'default',
+  eager: true,
+});
+
+function Admin() {
+  const [user, setUser] = useState(false);
+  const [ready, setReady] = useState(IS_MOCK_MODE);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState(false);
+  const [tab, setTab] = useState(0);
+
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [people, setPeople] = useState<Participant[]>([]);
+  const [certs, setCerts] = useState<Certificate[]>([]);
+
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('');
+
+  // Estado del formulario de Crear / Editar curso
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [cursoNombre, setCursoNombre] = useState('');
+  const [cursoFecha, setCursoFecha] = useState('');
+  const [cursoHoras, setCursoHoras] = useState('4');
+  const [cursoPin, setCursoPin] = useState('');
+  const [plantillaUrl, setPlantillaUrl] = useState('/plantillas/curso1.pdf');
+  const [configPlantilla, setConfigPlantilla] = useState<Template>(defaultTemplate);
+
+  const [assignId, setAssignId] = useState('');
+  const [assignCourse, setAssignCourse] = useState('');
+
+  const availableTemplates = useMemo(() => {
+    const urls = Object.keys(detectedTemplateModules).map((fullPath) =>
+      fullPath.replace(/^\/public/, '')
+    );
+    return urls.sort();
+  }, []);
+
+  useEffect(() => {
+    if (IS_MOCK_MODE) return;
+    return onAuthStateChanged(firebaseServices().auth, (u) => {
+      setUser(!!u);
+      setReady(true);
+      if (!u) {
+        setPeople([]);
+        setCerts([]);
+        setCourses([]);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    return watchCourses(setCourses);
+  }, [user]);
+
+  async function refresh() {
+    const [p, c] = await Promise.all([adminParticipants(), adminCertificates()]);
+    setPeople(p);
+    setCerts(c);
+  }
+
+  useEffect(() => {
+    if (user) {
+      refresh().catch(() => {
+        setError(true);
+        setMessage('No fue posible consultar los participantes. Revisa los permisos de Firebase.');
+      });
+    }
+  }, [user]);
+
+  async function run(action: () => Promise<unknown>, success = '') {
+    setBusy(true);
+    setMessage('');
+    setError(false);
+    try {
+      await action();
+      if (success) setMessage(success);
+    } catch (e) {
+      setError(true);
+      setMessage(e instanceof Error ? e.message : 'No fue posible completar la operación.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function login(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    await run(async () => {
+      await signInWithEmailAndPassword(
+        firebaseServices().auth,
+        String(data.get('email')),
+        String(data.get('password'))
+      );
+    }, '');
+  }
+
+  function openNewCourseForm() {
+    setEditingCourse(null);
+    setCursoNombre('');
+    setCursoFecha('');
+    setCursoHoras('4');
+    setCursoPin('');
+    setPlantillaUrl(availableTemplates[0] || '/plantillas/curso1.pdf');
+    setConfigPlantilla(defaultTemplate);
+    setFormOpen(true);
+    setMessage('');
+    setError(false);
+  }
+
+  function openEditCourseForm(course: Course) {
+    setEditingCourse(course);
+    setCursoNombre(course.nombre);
+    setCursoFecha(course.fecha);
+    setCursoHoras(String(course.horas));
+    setCursoPin('');
+    setPlantillaUrl(course.plantillaUrl || availableTemplates[0] || '/plantillas/curso1.pdf');
+    setConfigPlantilla(templateFrom(course.configPlantilla));
+    setFormOpen(true);
+    setMessage('');
+    setError(false);
+  }
+
+  async function handleSaveCourse(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const cleanUrl = plantillaUrl.trim();
+    if (!cleanUrl) {
+      setError(true);
+      setMessage('Debes seleccionar o escribir la ruta de la plantilla PDF.');
+      return;
+    }
+
+    await run(
+      async () => {
+        const coursePayload: Course = {
+          id: editingCourse ? editingCourse.id : crypto.randomUUID(),
+          nombre: cursoNombre.trim(),
+          fecha: cursoFecha,
+          horas: Number(cursoHoras),
+          asistenciaAbierta: editingCourse ? editingCourse.asistenciaAbierta : false,
+          plantillaUrl: cleanUrl,
+          configPlantilla,
+        };
+
+        await saveCourse(coursePayload, cursoPin.trim() ? cursoPin.trim() : undefined);
+        setFormOpen(false);
+        setEditingCourse(null);
+      },
+      editingCourse
+        ? 'Curso y plantilla actualizados correctamente.'
+        : 'Curso creado con su plantilla. Abre el pase de lista cuando comience la sesión.'
+    );
+  }
+
+  const filtered = people.filter(
+    (p) =>
+      `${p.nombre} ${p.email} ${p.telefono}`.toLowerCase().includes(search.toLowerCase()) &&
+      (!filter || certs.some((c) => c.participanteId === p.id && c.cursoId === filter))
+  );
+
+  function exportCsv() {
+    const cell = (value: unknown) =>
+      `"${String(value).replaceAll('"', '""').replace(/^[=+@-]/, "'$&")}"`;
+    const rows = [['Nombre', 'Correo', 'Teléfono/Matrícula', 'Curso', 'Folio', 'Fecha']];
+    for (const p of filtered) {
+      const matching = certs.filter(
+        (c) => c.participanteId === p.id && (!filter || c.cursoId === filter)
+      );
+      if (matching.length) {
+        matching.forEach((c) =>
+          rows.push([p.nombre, p.email, p.telefono, c.curso, c.folio, formatDate(c.fecha)])
+        );
+      } else {
+        rows.push([p.nombre, p.email, p.telefono, '', '', '']);
+      }
+    }
+    downloadFile(
+      '\uFEFF' + rows.map((row) => row.map(cell).join(',')).join('\r\n'),
+      'participantes.csv',
+      'text/csv;charset=utf-8'
+    );
+  }
+
+  async function printCertificate(cert: Certificate) {
+    const popup = window.open('', '_blank');
+    if (!popup) throw new Error('Permite ventanas emergentes para imprimir.');
+    try {
+      const bytes = await createCertificatePdf(cert);
+      const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }));
+      popup.location.href = url;
+      setTimeout(() => {
+        popup.print();
+        URL.revokeObjectURL(url);
+      }, 1500);
+    } catch (e) {
+      popup.close();
+      throw e;
+    }
+  }
+
+  if (!ready) {
+    return (
+      <PortalShell>
+        <div className="loading">Comprobando acceso…</div>
+      </PortalShell>
+    );
+  }
+
+  if (!user) {
+    return (
+      <PortalShell>
+        <section className="form-panel login-panel">
+          <div className="panel-heading">
+            <div className="heading-icon">
+              <LockKeyhole />
+            </div>
+            <div>
+              <h2>Acceso de administración</h2>
+              <p>Gestión de cursos y constancias</p>
+            </div>
+          </div>
+          <div className="form-body">
+            <Feedback message={message} error={error} />
+            {IS_MOCK_MODE ? (
+              <>
+                <div className="notice">
+                  Modo demostración. Este acceso permite explorar datos locales; no es una sesión de
+                  administrador real.
+                </div>
+                <Button className="submit-button" onClick={() => setUser(true)}>
+                  Explorar panel de demostración
+                  <ArrowRightIcon />
+                </Button>
+                <p className="field-hint mt-4">
+                  El acceso con correo y contraseña estará disponible al configurar Firebase Auth.
+                </p>
+              </>
+            ) : (
+              <form onSubmit={login}>
+                <label className="field">
+                  <span className="field-label">Correo electrónico</span>
+                  <input
+                    type="email"
+                    name="email"
+                    className="text-input"
+                    autoComplete="username"
+                    required
+                  />
+                </label>
+                <label className="field">
+                  <span className="field-label">Contraseña</span>
+                  <input
+                    type="password"
+                    name="password"
+                    className="text-input"
+                    autoComplete="current-password"
+                    required
+                  />
+                </label>
+                <Button className="submit-button" disabled={busy} type="submit">
+                  {busy ? 'Ingresando…' : 'Iniciar sesión'}
+                  <LockKeyhole />
+                </Button>
+              </form>
+            )}
+          </div>
+        </section>
+      </PortalShell>
+    );
+  }
+
+  return (
+    <PortalShell>
+      <div className="page-intro">
+        <div>
+          <div className="eyebrow">CENTRO DE GESTIÓN</div>
+          <h1 className="page-title">Administración</h1>
+          <p className="subtitle">Todo lo que necesitas para reconocer la participación.</p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() =>
+            run(async () => {
+              if (!IS_MOCK_MODE) await signOut(firebaseServices().auth);
+              setUser(false);
+              setPeople([]);
+              setCerts([]);
+              setMessage('');
+            })
+          }
+        >
+          <LogOut />
+          Salir
+        </Button>
+      </div>
+
+      <div className="admin-tabs">
+        {[
+          { label: 'Cursos y Plantillas', icon: BookOpen },
+          { label: 'Participantes y Constancias', icon: Users },
+        ].map((t, i) => (
+          <Button
+            key={t.label}
+            variant="outline"
+            className={tab === i ? 'selected' : ''}
+            onClick={() => {
+              setTab(i);
+              setMessage('');
+            }}
+          >
+            <t.icon />
+            {t.label}
+          </Button>
+        ))}
+      </div>
+
+      <Feedback message={message} error={error} />
+
+      {tab === 0 && (
+        <>
+          <div className="admin-tools">
+            <span className="subtitle">{courses.length} cursos registrados</span>
+            <Button
+              className="ml-auto"
+              onClick={() => (formOpen ? setFormOpen(false) : openNewCourseForm())}
+            >
+              <Plus />
+              {formOpen ? 'Cancelar' : 'Nuevo curso'}
+            </Button>
+          </div>
+
+          {formOpen && (
+            <section className="form-panel mb-6">
+              <div className="form-body">
+                <h2 className="text-xl mb-5">
+                  {editingCourse ? `Editar curso: ${editingCourse.nombre}` : 'Nuevo curso'}
+                </h2>
+
+                <form onSubmit={handleSaveCourse}>
+                  <div className="admin-grid">
+                    <label className="field">
+                      <span className="field-label">Nombre del curso</span>
+                      <input
+                        className="text-input"
+                        value={cursoNombre}
+                        onChange={(e) => setCursoNombre(e.target.value)}
+                        minLength={3}
+                        maxLength={150}
+                        required
+                      />
+                    </label>
+
+                    <label className="field">
+                      <span className="field-label">Fecha</span>
+                      <input
+                        className="text-input"
+                        type="date"
+                        value={cursoFecha}
+                        onChange={(e) => setCursoFecha(e.target.value)}
+                        required
+                      />
+                    </label>
+
+                    <label className="field">
+                      <span className="field-label">Horas de duración</span>
+                      <input
+                        className="text-input"
+                        type="number"
+                        min="0.5"
+                        max="1000"
+                        step="0.5"
+                        value={cursoHoras}
+                        onChange={(e) => setCursoHoras(e.target.value)}
+                        required
+                      />
+                    </label>
+
+                    <label className="field">
+                      <span className="field-label">
+                        {editingCourse
+                          ? 'Nuevo PIN (4 dígitos, opcional)'
+                          : 'PIN de asistencia · 4 dígitos'}
+                      </span>
+                      <input
+                        className="text-input"
+                        type="text"
+                        pattern="[0-9]{4}"
+                        maxLength={4}
+                        inputMode="numeric"
+                        placeholder={editingCourse ? 'Dejar vacío para conservar' : 'Ej. 4826'}
+                        value={cursoPin}
+                        onChange={(e) => setCursoPin(e.target.value)}
+                        required={!editingCourse}
+                      />
+                    </label>
+                  </div>
+
+                  {/* Selector de Plantilla desde public/plantillas/ */}
+                  <div className="mt-4">
+                    <label className="field">
+                      <span className="field-label">
+                        Plantilla PDF del curso (carpeta <code>public/plantillas/</code>)
+                      </span>
+
+                      {availableTemplates.length > 0 ? (
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <select
+                            className="text-input"
+                            value={
+                              availableTemplates.includes(plantillaUrl) ? plantillaUrl : '__custom__'
+                            }
+                            onChange={(e) => {
+                              if (e.target.value !== '__custom__') {
+                                setPlantillaUrl(e.target.value);
+                              }
+                            }}
+                          >
+                            {availableTemplates.map((url) => (
+                              <option key={url} value={url}>
+                                {url}
+                              </option>
+                            ))}
+                            <option value="__custom__">Otra ruta manual...</option>
+                          </select>
+
+                          <input
+                            className="text-input"
+                            placeholder="/plantillas/curso1.pdf"
+                            value={plantillaUrl}
+                            onChange={(e) => setPlantillaUrl(e.target.value)}
+                            required
+                          />
+                        </div>
+                      ) : (
+                        <input
+                          className="text-input"
+                          placeholder="/plantillas/curso1.pdf"
+                          value={plantillaUrl}
+                          onChange={(e) => setPlantillaUrl(e.target.value)}
+                          required
+                        />
+                      )}
+                      <span className="field-hint">
+                        Coloca tus PDFs en <code>public/plantillas/</code> y súbelos a GitHub para
+                        que aparezcan aquí.
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Calibrador visual integrado para este curso */}
+                  <Calibrator
+                    value={configPlantilla}
+                    onChange={setConfigPlantilla}
+                    templateUrl={plantillaUrl}
+                  />
+
+                  <div className="mt-6 flex gap-3">
+                    <Button disabled={busy} type="submit">
+                      <Save />
+                      {editingCourse ? 'Guardar cambios del curso' : 'Guardar curso y plantilla'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setFormOpen(false);
+                        setEditingCourse(null);
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            </section>
+          )}
+
+          <div className="admin-grid mb-10">
+            {courses.map((c) => (
+              <article key={c.id} className="admin-course">
+                <div className="flex items-start justify-between gap-2">
+                  <h3>{c.nombre}</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    title="Editar curso y plantilla"
+                    onClick={() => openEditCourseForm(c)}
+                  >
+                    <Pencil size={15} />
+                    Editar
+                  </Button>
+                </div>
+
+                <div className="course-meta">
+                  <span>
+                    <CalendarDays />
+                    {formatDate(c.fecha)}
+                  </span>
+                  <span>
+                    <Clock3 />
+                    {c.horas} horas
+                  </span>
+                  <span>
+                    <FileText />
+                    {c.plantillaUrl || 'Sin plantilla asignada'}
+                  </span>
+                </div>
+
+                <div className="admin-course-footer">
+                  <span className={`status ${c.asistenciaAbierta ? '' : 'closed'}`}>
+                    <span className="status-dot" />
+                    {c.asistenciaAbierta ? 'Pase de lista abierto' : 'Pase de lista cerrado'}
+                  </span>
+                  <Switch
+                    aria-label={`Abrir / Cerrar Pase de Lista: ${c.nombre}`}
+                    checked={c.asistenciaAbierta}
+                    disabled={busy}
+                    onCheckedChange={(value) =>
+                      run(
+                        () => saveCourse({ ...c, asistenciaAbierta: value }),
+                        'Estado de asistencia actualizado.'
+                      )
+                    }
+                  />
+                </div>
+              </article>
+            ))}
+          </div>
+        </>
+      )}
+
+      {tab === 1 && (
+        <>
+          <div className="admin-tools">
+            <div className="input-wrap">
+              <Search />
+              <input
+                aria-label="Buscar participantes"
+                className="text-input"
+                placeholder="Buscar por nombre o correo"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <select
+              aria-label="Filtrar por curso"
+              className="text-input"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            >
+              <option value="">Todos los cursos</option>
+              {courses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </select>
+            <Button variant="outline" className="ml-auto" onClick={exportCsv}>
+              <Download />
+              Exportar CSV
+            </Button>
+          </div>
+
+          <div className="table-scroll mb-6">
+            <table>
+              <thead>
+                <tr>
+                  <th>Participante</th>
+                  <th>Teléfono / Matrícula</th>
+                  <th>Constancias</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      {p.nombre}
+                      <small>{p.email}</small>
+                    </td>
+                    <td>{p.telefono}</td>
+                    <td>
+                      {certs
+                        .filter(
+                          (c) => c.participanteId === p.id && (!filter || c.cursoId === filter)
+                        )
+                        .map((c) => (
+                          <div key={c.folio} className="mb-2">
+                            {c.curso}
+                            <div className="flex gap-1 mt-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Descargar PDF"
+                                aria-label={`Descargar PDF de ${p.nombre}`}
+                                onClick={() => run(() => downloadCertificate(c))}
+                              >
+                                <Download />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Imprimir constancia"
+                                aria-label={`Imprimir constancia de ${p.nombre}`}
+                                onClick={() => run(() => printCertificate(c))}
+                              >
+                                <Printer />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                    </td>
+                    <td>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setAssignId(p.id);
+                          setAssignCourse(filter || courses[0]?.id || '');
+                        }}
+                      >
+                        <Award />
+                        Asignar
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!filtered.length && (
+              <div className="empty-state">No hay participantes que coincidan con tu búsqueda.</div>
+            )}
+          </div>
+
+          <p className="field-hint mb-8">
+            {filtered.length} participantes · {certs.length} constancias emitidas
+          </p>
+
+          {assignId && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Asignar constancia"
+              className="assignment-modal"
+            >
+              <div className="form-panel assignment-content">
+                <div className="form-body">
+                  <h2 className="text-xl mb-3">Asignar constancia</h2>
+                  <p className="subtitle mb-5">
+                    {people.find((p) => p.id === assignId)?.nombre}
+                  </p>
+                  <label className="field">
+                    <span className="field-label">Curso acreditado</span>
+                    <select
+                      className="text-input"
+                      value={assignCourse}
+                      onChange={(e) => setAssignCourse(e.target.value)}
+                    >
+                      {courses.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="flex gap-3">
+                    <Button
+                      disabled={busy || !assignCourse}
+                      onClick={() =>
+                        run(async () => {
+                          const person = people.find((p) => p.id === assignId);
+                          const course = courses.find((c) => c.id === assignCourse);
+                          if (!person || !course) throw new Error('Selecciona un curso.');
+                          await assignCertificate(person, course);
+                          await refresh();
+                          setAssignId('');
+                        }, 'Constancia asignada correctamente.')
+                      }
+                    >
+                      <Award />
+                      Asignar constancia
+                    </Button>
+                    <Button variant="outline" onClick={() => setAssignId('')}>
+                      Cancelar
+                    </Button>
+                  </div>
+                  <Feedback message={message} error={error} />
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </PortalShell>
+  );
 }
-function ArrowRightIcon(){return <span aria-hidden="true">→</span>}
+
+function ArrowRightIcon() {
+  return <span aria-hidden="true">→</span>;
+}
