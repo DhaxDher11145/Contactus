@@ -251,4 +251,185 @@ function Index() {
                 </div>
                 {tab === 0 && (
                   <p className="field-hint">
-                    Será tu identificador para el pase de lista y tus const
+                    Será tu identificador para el pase de lista y tus constancias.
+                  </p>
+                )}
+              </label>
+
+              {tab === 0 && (
+                <>
+                  <label className="field">
+                    <span className="field-label">
+                      Teléfono o matrícula <em>*</em>
+                    </span>
+                    <div className="input-wrap">
+                      <Hash />
+                      <input
+                        className="text-input"
+                        name="telefono"
+                        placeholder="Tu número de teléfono o matrícula"
+                        required
+                        maxLength={40}
+                      />
+                    </div>
+                  </label>
+
+                  <div className="notice">
+                    <Info />
+                    <span>
+                      <strong>Revisa tu ortografía y acentos antes de continuar.</strong>
+                      <br />
+                      Tu nombre se guardará en MAYÚSCULAS en el orden Nombre(s) + Apellidos para todas tus constancias.
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {tab === 1 && (
+                <>
+                  <label className="field">
+                    <span className="field-label">
+                      Curso <em>*</em>
+                    </span>
+                    <select className="text-input" name="curso" required defaultValue="">
+                      <option value="" disabled>
+                        Selecciona el curso al que asistes
+                      </option>
+                      {courses
+                        .filter((c) => c.asistenciaAbierta)
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.nombre}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+
+                  <label className="field">
+                    <span className="field-label">
+                      PIN de asistencia <em>*</em>
+                    </span>
+                    <div className="input-wrap">
+                      <LockKeyhole />
+                      <input
+                        type="password"
+                        className="text-input"
+                        name="pin"
+                        placeholder="Ingresa el PIN de 4 dígitos"
+                        inputMode="numeric"
+                        pattern="[0-9]{4}"
+                        maxLength={4}
+                        required
+                      />
+                    </div>
+                    <p className="field-hint">Solicita el PIN al instructor de tu curso.</p>
+                  </label>
+                </>
+              )}
+
+              <Button className="submit-button" type="submit" disabled={busy}>
+                {busy
+                  ? 'Procesando…'
+                  : ['Completar mi registro', 'Confirmar mi asistencia', 'Buscar mis constancias'][
+                      tab
+                    ]}
+                {tab === 2 ? <Search size={17} /> : <ArrowRight size={17} />}
+              </Button>
+
+              {tab === 0 && (
+                <p className="privacy-note">
+                  <LockKeyhole size={11} />
+                  Tus datos se usan únicamente para gestionar tu participación.
+                </p>
+              )}
+            </form>
+
+            {tab === 2 &&
+              searched &&
+              (certs.length ? (
+                certs.map((c) => (
+                  <article className="certificate-item" key={c.folio}>
+                    <span className="status">
+                      <Check size={12} />
+                      Acreditado
+                    </span>
+                    <h3>{c.curso}</h3>
+                    <p className="field-hint">
+                      {c.nombre} · {formatDate(c.fecha)} · {c.horas} horas
+                    </p>
+                    <p className="field-hint">{c.folio}</p>
+                    <Button
+                      variant="outline"
+                      className="mt-4"
+                      disabled={busy}
+                      onClick={() => download(c)}
+                    >
+                      <Download />
+                      Descargar PDF
+                    </Button>
+                  </article>
+                ))
+              ) : (
+                <div className="empty-state">
+                  <Award size={32} />
+                  <p>Aún no hay constancias asociadas a este correo.</p>
+                </div>
+              ))}
+          </div>
+        </section>
+
+        <aside>
+          <div className="side-heading">
+            <h2>Próximos cursos</h2>
+            <span className="count-label">{courses.length} cursos disponibles</span>
+          </div>
+
+          {courses.map((course, i) => (
+            <article className="course-card" key={course.id}>
+              {i === 0 && (
+                <img
+                  className="course-photo"
+                  src={workshop}
+                  width={1200}
+                  height={608}
+                  alt="Participantes colaborando en un taller de formación"
+                />
+              )}
+              <div className="course-body">
+                <div className="course-top">
+                  <span className="course-category">
+                    {course.categoria ?? 'Formación continua'}
+                  </span>
+                  <span className={`status ${course.asistenciaAbierta ? '' : 'closed'}`}>
+                    <span className="status-dot" />
+                    {course.asistenciaAbierta ? 'Asistencia abierta' : 'Próximamente'}
+                  </span>
+                </div>
+                <h3 className="course-title">{course.nombre}</h3>
+                <div className="course-meta">
+                  <span>
+                    <CalendarDays />
+                    {formatDate(course.fecha)}
+                  </span>
+                  <span>
+                    <Clock3 />
+                    {course.horas} horas
+                  </span>
+                </div>
+              </div>
+            </article>
+          ))}
+
+          <div className="side-note">
+            <Info />
+            <span>
+              ¿Ya te registraste? No necesitas hacerlo de nuevo.
+              <br />
+              Ve directamente al pase de lista de tu curso.
+            </span>
+          </div>
+        </aside>
+      </div>
+    </PortalShell>
+  );
+}
