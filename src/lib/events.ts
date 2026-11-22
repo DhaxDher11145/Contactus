@@ -40,6 +40,7 @@ export type Course = {
   id: string;
   nombre: string;
   fecha: string;
+  horaInicio?: string;
   horas: number;
   asistenciaAbierta: boolean;
   categoria?: string;
@@ -62,6 +63,13 @@ export type Certificate = {
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 export const participantId = (email: string) => normalizeEmail(email);
 export const validPin = (pin: string) => /^\d{4}$/.test(pin);
+
+// Solo letras (incluyendo ñ/Ñ, ü/Ü y vocales con tilde) y espacios
+export const sanitizePersonName = (value: string) =>
+  value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, '');
+
+export const isValidPersonName = (value: string) =>
+  /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+(?:\s+[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]+)*$/.test(value.trim());
 
 export function assertAttendance(
   participant: Participant | undefined,
@@ -93,6 +101,7 @@ function seed(): Store {
         id: 'liderazgo',
         nombre: 'Liderazgo y gestión de equipos',
         fecha: '2026-11-18',
+        horaInicio: '10:00',
         horas: 4,
         asistenciaAbierta: true,
         categoria: 'Desarrollo profesional',
@@ -156,12 +165,26 @@ export async function registerParticipant(input: Omit<Participant, 'id'>) {
     throw new Error('Usa un correo electrónico sin barras.');
   }
 
-  const nombresLimpios = input.nombres?.trim().toUpperCase();
-  const apellidosLimpios = input.apellidos?.trim().toUpperCase();
+  const rawNombres = input.nombres?.trim().replace(/\s+/g, ' ');
+  const rawApellidos = input.apellidos?.trim().replace(/\s+/g, ' ');
+  const rawNombre = input.nombre.trim().replace(/\s+/g, ' ');
+
+  if (rawNombres !== undefined && !isValidPersonName(rawNombres)) {
+    throw new Error('El nombre solo puede contener letras, espacios y tildes (sin números ni signos).');
+  }
+  if (rawApellidos !== undefined && !isValidPersonName(rawApellidos)) {
+    throw new Error('Los apellidos solo pueden contener letras, espacios y tildes (sin números ni signos).');
+  }
+  if (!isValidPersonName(rawNombre)) {
+    throw new Error('El nombre solo puede contener letras, espacios y tildes (sin números ni signos).');
+  }
+
+  const nombresLimpios = rawNombres?.toUpperCase();
+  const apellidosLimpios = rawApellidos?.toUpperCase();
   const nombreFinal =
     nombresLimpios && apellidosLimpios
       ? `${nombresLimpios} ${apellidosLimpios}`
-      : input.nombre.trim().toUpperCase();
+      : rawNombre.toUpperCase();
 
   const person: Participant = {
     ...input,
@@ -266,9 +289,23 @@ export async function markAttendance(email: string, courseId: string, pin: strin
 }
 
 export async function findCertificates(email: string): Promise<Certificate[]> {
-  if (IS_MOCK_MODE) return read().constancias.filter((c) => c.email === normalizeEmail(email));
+  const normalized = normalizeEmail(email);
+
+  if (IS_MOCK_MODE) {
+    const data = read();
+    const exists = data.participantes.some((p) => p.email === normalized);
+    if (!exists) throw new Error('Correo no registrado');
+    return data.constancias.filter((c) => c.email === normalized);
+  }
+
+  const db = firebaseServices().db;
+  const participantSnap = await getDoc(doc(db, 'participantes', participantId(normalized)));
+  if (!participantSnap.exists()) {
+    throw new Error('Correo no registrado');
+  }
+
   return (
-    await getDocs(query(collection(firebaseServices().db, 'constancias'), where('email', '==', normalizeEmail(email))))
+    await getDocs(query(collection(db, 'constancias'), where('email', '==', normalized)))
   ).docs.map((d) => d.data() as Certificate);
 }
 
@@ -298,6 +335,7 @@ export async function saveCourse(course: Course, pin?: string) {
   }
   const cleanCourse: Course = {
     ...course,
+    horaInicio: course.horaInicio?.trim() || '',
     configPlantilla: templateFrom(course.configPlantilla),
   };
 

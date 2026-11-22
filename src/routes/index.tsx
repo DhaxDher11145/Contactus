@@ -24,6 +24,7 @@ import {
   markAttendance,
   findCertificates,
   formatDate,
+  sanitizePersonName,
   type Course,
   type Certificate,
 } from '@/lib/events';
@@ -48,6 +49,9 @@ function Index() {
   const [certs, setCerts] = useState<Certificate[]>([]);
   const [searched, setSearched] = useState(false);
 
+  const [nombres, setNombres] = useState('');
+  const [apellidos, setApellidos] = useState('');
+
   useEffect(() => watchCourses(setCourses), []);
 
   function changeTab(i: number) {
@@ -68,13 +72,13 @@ function Index() {
 
     try {
       if (tab === 0) {
-        const nombres = String(data.get('nombres') ?? '').trim();
-        const apellidos = String(data.get('apellidos') ?? '').trim();
-        const nombreCompleto = `${nombres} ${apellidos}`.trim().toUpperCase();
+        const cleanNombres = sanitizePersonName(nombres).trim();
+        const cleanApellidos = sanitizePersonName(apellidos).trim();
+        const nombreCompleto = `${cleanNombres} ${cleanApellidos}`.trim().toUpperCase();
 
         await registerParticipant({
-          nombres,
-          apellidos,
+          nombres: cleanNombres,
+          apellidos: cleanApellidos,
           nombre: nombreCompleto,
           email: String(data.get('email') ?? ''),
           telefono: String(data.get('telefono') ?? ''),
@@ -83,6 +87,8 @@ function Index() {
         setMessage(
           `¡Registro completado como ${nombreCompleto}! Ahora puedes confirmar tu asistencia en Pase de Lista.`
         );
+        setNombres('');
+        setApellidos('');
         form.reset();
       } else if (tab === 1) {
         const email = String(data.get('email') ?? '');
@@ -94,8 +100,11 @@ function Index() {
           `¡Asistencia confirmada! Tu constancia ${cert.folio} está disponible en Mis Constancias.`
         );
       } else {
+        setSearched(false);
+        setCerts([]);
         const email = String(data.get('email') ?? '');
-        setCerts(await findCertificates(email));
+        const results = await findCertificates(email);
+        setCerts(results);
         setSearched(true);
       }
     } catch (err) {
@@ -202,6 +211,8 @@ function Index() {
                       <input
                         className="text-input uppercase"
                         name="nombres"
+                        value={nombres}
+                        onChange={(e) => setNombres(sanitizePersonName(e.target.value))}
                         placeholder="Ej. Juan Carlos"
                         required
                         minLength={2}
@@ -220,6 +231,8 @@ function Index() {
                       <input
                         className="text-input uppercase"
                         name="apellidos"
+                        value={apellidos}
+                        onChange={(e) => setApellidos(sanitizePersonName(e.target.value))}
                         placeholder="Ej. Pérez López"
                         required
                         minLength={2}
@@ -228,7 +241,7 @@ function Index() {
                       />
                     </div>
                     <p className="field-hint">
-                      Se imprimirá exactamente como NOMBRE(S) APELLIDOS en mayúsculas en tu constancia.
+                      Solo se permiten letras y tildes. Se imprimirá como NOMBRE(S) APELLIDOS en mayúsculas.
                     </p>
                   </label>
                 </>
@@ -410,6 +423,7 @@ function Index() {
                   <span>
                     <CalendarDays />
                     {formatDate(course.fecha)}
+                    {course.horaInicio ? ` · ${course.horaInicio} hrs` : ''}
                   </span>
                   <span>
                     <Clock3 />

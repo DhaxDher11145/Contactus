@@ -75,6 +75,7 @@ function Admin() {
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [cursoNombre, setCursoNombre] = useState('');
   const [cursoFecha, setCursoFecha] = useState('');
+  const [cursoHoraInicio, setCursoHoraInicio] = useState('');
   const [cursoHoras, setCursoHoras] = useState('4');
   const [cursoPin, setCursoPin] = useState('');
   const [plantillaUrl, setPlantillaUrl] = useState('/plantillas/curso1.pdf');
@@ -154,6 +155,7 @@ function Admin() {
     setEditingCourse(null);
     setCursoNombre('');
     setCursoFecha('');
+    setCursoHoraInicio('');
     setCursoHoras('4');
     setCursoPin('');
     setPlantillaUrl(availableTemplates[0] || '/plantillas/curso1.pdf');
@@ -167,6 +169,7 @@ function Admin() {
     setEditingCourse(course);
     setCursoNombre(course.nombre);
     setCursoFecha(course.fecha);
+    setCursoHoraInicio(course.horaInicio || '');
     setCursoHoras(String(course.horas));
     setCursoPin('');
     setPlantillaUrl(course.plantillaUrl || availableTemplates[0] || '/plantillas/curso1.pdf');
@@ -191,6 +194,7 @@ function Admin() {
           id: editingCourse ? editingCourse.id : crypto.randomUUID(),
           nombre: cursoNombre.trim(),
           fecha: cursoFecha,
+          horaInicio: cursoHoraInicio.trim(),
           horas: Number(cursoHoras),
           asistenciaAbierta: editingCourse ? editingCourse.asistenciaAbierta : false,
           plantillaUrl: cleanUrl,
@@ -394,7 +398,7 @@ function Admin() {
                 <form onSubmit={handleSaveCourse}>
                   <div className="admin-grid">
                     <label className="field">
-                      <span className="field-label">Nombre del curso</span>
+                      <span className="field-label">Nombre del curso / conferencia</span>
                       <input
                         className="text-input"
                         value={cursoNombre}
@@ -413,6 +417,16 @@ function Admin() {
                         value={cursoFecha}
                         onChange={(e) => setCursoFecha(e.target.value)}
                         required
+                      />
+                    </label>
+
+                    <label className="field">
+                      <span className="field-label">Hora de inicio</span>
+                      <input
+                        className="text-input"
+                        type="time"
+                        value={cursoHoraInicio}
+                        onChange={(e) => setCursoHoraInicio(e.target.value)}
                       />
                     </label>
 
@@ -550,6 +564,7 @@ function Admin() {
                   <span>
                     <CalendarDays />
                     {formatDate(c.fecha)}
+                    {c.horaInicio ? ` · ${c.horaInicio} hrs` : ''}
                   </span>
                   <span>
                     <Clock3 />
