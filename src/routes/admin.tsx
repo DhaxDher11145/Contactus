@@ -48,8 +48,8 @@ export const Route = createFileRoute('/admin')({
   component: Admin,
 });
 
-// Detecta automáticamente todos los PDFs colocados en public/plantillas/
-const detectedTemplateModules = import.meta.glob('/public/plantillas/*.pdf', {
+// Detecta automáticamente TODOS los PDFs en public/ (Plantillas/, plantillas/, raíz, .pdf y .PDF)
+const detectedTemplateModules = import.meta.glob('/public/**/*.{pdf,PDF}', {
   query: '?url',
   import: 'default',
   eager: true,
@@ -78,17 +78,21 @@ function Admin() {
   const [cursoHoraInicio, setCursoHoraInicio] = useState('');
   const [cursoHoras, setCursoHoras] = useState('4');
   const [cursoPin, setCursoPin] = useState('');
-  const [plantillaUrl, setPlantillaUrl] = useState('/plantillas/curso1.pdf');
+  const [plantillaUrl, setPlantillaUrl] = useState('');
+  const [manualMode, setManualMode] = useState(false);
   const [configPlantilla, setConfigPlantilla] = useState<Template>(defaultTemplate);
 
   const [assignId, setAssignId] = useState('');
   const [assignCourse, setAssignCourse] = useState('');
 
   const availableTemplates = useMemo(() => {
-    const urls = Object.keys(detectedTemplateModules).map((fullPath) =>
-      fullPath.replace(/^\/public/, '')
-    );
-    return urls.sort();
+    return Object.keys(detectedTemplateModules)
+      .map((fullPath) => {
+        const url = fullPath.replace(/^\/public/, '');
+        const fileName = url.split('/').pop() || url;
+        return { url, fileName };
+      })
+      .sort((a, b) => a.fileName.localeCompare(b.fileName));
   }, []);
 
   useEffect(() => {
@@ -158,7 +162,9 @@ function Admin() {
     setCursoHoraInicio('');
     setCursoHoras('4');
     setCursoPin('');
-    setPlantillaUrl(availableTemplates[0] || '/plantillas/curso1.pdf');
+    const firstTemplate = availableTemplates[0]?.url || '';
+    setPlantillaUrl(firstTemplate);
+    setManualMode(availableTemplates.length === 0);
     setConfigPlantilla(defaultTemplate);
     setFormOpen(true);
     setMessage('');
@@ -172,7 +178,10 @@ function Admin() {
     setCursoHoraInicio(course.horaInicio || '');
     setCursoHoras(String(course.horas));
     setCursoPin('');
-    setPlantillaUrl(course.plantillaUrl || availableTemplates[0] || '/plantillas/curso1.pdf');
+    const currentUrl = course.plantillaUrl || availableTemplates[0]?.url || '';
+    setPlantillaUrl(currentUrl);
+    const existsInList = availableTemplates.some((t) => t.url === currentUrl);
+    setManualMode(!existsInList && availableTemplates.length === 0);
     setConfigPlantilla(templateFrom(course.configPlantilla));
     setFormOpen(true);
     setMessage('');
@@ -184,7 +193,7 @@ function Admin() {
     const cleanUrl = plantillaUrl.trim();
     if (!cleanUrl) {
       setError(true);
-      setMessage('Debes seleccionar o escribir la ruta de la plantilla PDF.');
+      setMessage('Debes seleccionar una plantilla PDF de la lista.');
       return;
     }
 
@@ -328,6 +337,8 @@ function Admin() {
     );
   }
 
+  const isKnownTemplate = availableTemplates.some((t) => t.url === plantillaUrl);
+
   return (
     <PortalShell>
       <div className="page-intro">
@@ -464,54 +475,60 @@ function Admin() {
                     </label>
                   </div>
 
-                  {/* Selector de Plantilla desde public/plantillas/ */}
+                  {/* Menú desplegable automático de todas las constancias PDF disponibles */}
                   <div className="mt-4">
                     <label className="field">
                       <span className="field-label">
-                        Plantilla PDF del curso (carpeta <code>public/plantillas/</code>)
+                        Seleccionar diseño de constancia ({availableTemplates.length} disponibles)
                       </span>
 
                       {availableTemplates.length > 0 ? (
-                        <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="flex flex-col gap-3">
                           <select
                             className="text-input"
-                            value={
-                              availableTemplates.includes(plantillaUrl) ? plantillaUrl : '__custom__'
-                            }
+                            value={manualMode || !isKnownTemplate ? '__custom__' : plantillaUrl}
                             onChange={(e) => {
-                              if (e.target.value !== '__custom__') {
+                              if (e.target.value === '__custom__') {
+                                setManualMode(true);
+                              } else {
+                                setManualMode(false);
                                 setPlantillaUrl(e.target.value);
                               }
                             }}
+                            required
                           >
-                            {availableTemplates.map((url) => (
-                              <option key={url} value={url}>
-                                {url}
+                            <option value="" disabled>
+                              -- Elige una constancia PDF --
+                            </option>
+                            {availableTemplates.map((tpl) => (
+                              <option key={tpl.url} value={tpl.url}>
+                                {tpl.fileName} ({tpl.url})
                               </option>
                             ))}
-                            <option value="__custom__">Otra ruta manual...</option>
+                            <option value="__custom__">Escribir ruta manual...</option>
                           </select>
 
-                          <input
-                            className="text-input"
-                            placeholder="/plantillas/curso1.pdf"
-                            value={plantillaUrl}
-                            onChange={(e) => setPlantillaUrl(e.target.value)}
-                            required
-                          />
+                          {(manualMode || (!isKnownTemplate && plantillaUrl !== '')) && (
+                            <input
+                              className="text-input"
+                              placeholder="/Plantillas/CONSTANCIAS_PARTICIPANTES_3.pdf"
+                              value={plantillaUrl}
+                              onChange={(e) => setPlantillaUrl(e.target.value)}
+                              required
+                            />
+                          )}
                         </div>
                       ) : (
                         <input
                           className="text-input"
-                          placeholder="/plantillas/curso1.pdf"
+                          placeholder="/Plantillas/CONSTANCIAS_PARTICIPANTES_3.pdf"
                           value={plantillaUrl}
                           onChange={(e) => setPlantillaUrl(e.target.value)}
                           required
                         />
                       )}
                       <span className="field-hint">
-                        Coloca tus PDFs en <code>public/plantillas/</code> y súbelos a GitHub para
-                        que aparezcan aquí.
+                        El menú detecta automáticamente cualquier PDF dentro de <code>public/Plantillas/</code> o <code>public/plantillas/</code>.
                       </span>
                     </label>
                   </div>
