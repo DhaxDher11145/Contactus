@@ -14,6 +14,8 @@ import {
   ClipboardCheck,
   Download,
   Search,
+  MapPin,
+  ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PortalShell, Feedback } from '@/components/portal';
@@ -30,6 +32,12 @@ import {
 } from '@/lib/events';
 import { downloadCertificate } from '@/lib/certificates';
 import workshop from '@/assets/workshop.jpg';
+
+const VENUE_ADDRESS = 'Calle 8 #252, Col. Rafael Alvarado, Orizaba, Ver.';
+const GOOGLE_MAPS_URL = 'https://maps.app.goo.gl/RpNUq3TKA14L4KHPA?g_st=aw';
+const APPLE_MAPS_URL = `https://maps.apple.com/?q=${encodeURIComponent(
+  'Calle 8 252, Rafael Alvarado, Orizaba, Veracruz, Mexico'
+)}`;
 
 export const Route = createFileRoute('/')({
   head: () =>
@@ -433,6 +441,33 @@ function Index() {
               </div>
             </article>
           ))}
+
+          <article className="course-card">
+            <div className="course-body">
+              <div className="course-top">
+                <span className="course-category">Sede del evento</span>
+              </div>
+              <h3 className="course-title flex items-center gap-2">
+                <MapPin size={18} className="shrink-0" />
+                <span>Ubicación</span>
+              </h3>
+              <p className="field-hint mt-1 mb-4">{VENUE_ADDRESS}</p>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild variant="outline" size="sm">
+                  <a href={GOOGLE_MAPS_URL} target="_blank" rel="noopener noreferrer">
+                    Google Maps
+                    <ExternalLink size={14} />
+                  </a>
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <a href={APPLE_MAPS_URL} target="_blank" rel="noopener noreferrer">
+                    Apple Maps
+                    <ExternalLink size={14} />
+                  </a>
+                </Button>
+              </div>
+            </div>
+          </article>
 
           <div className="side-note">
             <Info />
