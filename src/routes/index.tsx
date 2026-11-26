@@ -35,7 +35,8 @@ import workshop from '@/assets/workshop.jpg';
 
 const VENUE_ADDRESS = 'Calle 8 #252, Col. Rafael Alvarado, Orizaba, Ver.';
 const GOOGLE_MAPS_URL = 'https://maps.app.goo.gl/RpNUq3TKA14L4KHPA?g_st=aw';
-const APPLE_MAPS_URL = 'https://maps.apple/p/tbjC6wuH_oGxWH';
+const MAP_EMBED_URL =
+  'https://maps.google.com/maps?q=Calle%208%20252%2C%20Rafael%20Alvarado%2C%20Orizaba%2C%20Veracruz&t=&z=16&ie=UTF8&iwloc=&output=embed';
 
 export const Route = createFileRoute('/')({
   head: () =>
@@ -449,21 +450,24 @@ function Index() {
                 <MapPin size={18} className="shrink-0" />
                 <span>Ubicación</span>
               </h3>
-              <p className="field-hint mt-1 mb-4">{VENUE_ADDRESS}</p>
-              <div className="flex flex-wrap gap-2">
-                <Button asChild variant="outline" size="sm">
-                  <a href={GOOGLE_MAPS_URL} target="_blank" rel="noopener noreferrer">
-                    Google Maps
-                    <ExternalLink size={14} />
-                  </a>
-                </Button>
-                <Button asChild variant="outline" size="sm">
-                  <a href={APPLE_MAPS_URL} target="_blank" rel="noopener noreferrer">
-                    Apple Maps
-                    <ExternalLink size={14} />
-                  </a>
-                </Button>
+              <p className="field-hint mt-1 mb-3">{VENUE_ADDRESS}</p>
+
+              <div className="w-full overflow-hidden rounded-lg border mb-4">
+                <iframe
+                  title="Mapa de ubicación del evento"
+                  src={MAP_EMBED_URL}
+                  className="w-full h-48 border-0 block"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
               </div>
+
+              <Button asChild variant="outline" size="sm" className="w-full">
+                <a href={GOOGLE_MAPS_URL} target="_blank" rel="noopener noreferrer">
+                  Abrir en Google Maps
+                  <ExternalLink size={14} />
+                </a>
+              </Button>
             </div>
           </article>
 
