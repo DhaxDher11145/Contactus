@@ -35,9 +35,7 @@ import workshop from '@/assets/workshop.jpg';
 
 const VENUE_ADDRESS = 'Calle 8 #252, Col. Rafael Alvarado, Orizaba, Ver.';
 const GOOGLE_MAPS_URL = 'https://maps.app.goo.gl/RpNUq3TKA14L4KHPA?g_st=aw';
-const APPLE_MAPS_URL = `https://maps.apple.com/?q=${encodeURIComponent(
-  'Calle 8 252, Rafael Alvarado, Orizaba, Veracruz, Mexico'
-)}`;
+const APPLE_MAPS_URL = 'https://maps.apple/p/tbjC6wuH_oGxWH';
 
 export const Route = createFileRoute('/')({
   head: () =>
