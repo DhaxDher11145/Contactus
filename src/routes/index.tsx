@@ -33,10 +33,24 @@ import {
 import { downloadCertificate } from '@/lib/certificates';
 import workshop from '@/assets/workshop.jpg';
 
-const VENUE_ADDRESS = 'Calle 8 #252, Col. Rafael Alvarado, Orizaba, Ver.';
-const GOOGLE_MAPS_URL = 'https://maps.app.goo.gl/RpNUq3TKA14L4KHPA?g_st=aw';
-const MAP_EMBED_URL =
-  'https://maps.google.com/maps?q=Calle%208%20252%2C%20Rafael%20Alvarado%2C%20Orizaba%2C%20Veracruz&t=&z=16&ie=UTF8&iwloc=&output=embed';
+const VENUES = [
+  {
+    date: '27 de noviembre',
+    title: 'Centro de Convenciones COCO',
+    address: 'Orizaba, Ver.',
+    mapsUrl: 'https://maps.app.goo.gl/ZF1LjGDmFBbkaxcaA',
+    embedUrl:
+      'https://maps.google.com/maps?q=Centro%20de%20Convenciones%20COCO%2C%20Orizaba%2C%20Veracruz&t=&z=16&ie=UTF8&iwloc=&output=embed',
+  },
+  {
+    date: '28 de noviembre',
+    title: 'Talleres Salas Contactus',
+    address: 'Calle 8 #252, Col. Rafael Alvarado, Orizaba, Ver.',
+    mapsUrl: 'https://maps.app.goo.gl/RpNUq3TKA14L4KHPA?g_st=aw',
+    embedUrl:
+      'https://maps.google.com/maps?q=Calle%208%20252%2C%20Rafael%20Alvarado%2C%20Orizaba%2C%20Veracruz&t=&z=16&ie=UTF8&iwloc=&output=embed',
+  },
+];
 
 export const Route = createFileRoute('/')({
   head: () =>
@@ -441,35 +455,37 @@ function Index() {
             </article>
           ))}
 
-          <article className="course-card">
-            <div className="course-body">
-              <div className="course-top">
-                <span className="course-category">Sede del evento</span>
-              </div>
-              <h3 className="course-title flex items-center gap-2">
-                <MapPin size={18} className="shrink-0" />
-                <span>Ubicación</span>
-              </h3>
-              <p className="field-hint mt-1 mb-3">{VENUE_ADDRESS}</p>
+          {VENUES.map((venue) => (
+            <article className="course-card" key={venue.date}>
+              <div className="course-body">
+                <div className="course-top">
+                  <span className="course-category">Sede · {venue.date}</span>
+                </div>
+                <h3 className="course-title flex items-center gap-2">
+                  <MapPin size={18} className="shrink-0" />
+                  <span>{venue.title}</span>
+                </h3>
+                <p className="field-hint mt-1 mb-3">{venue.address}</p>
 
-              <div className="w-full overflow-hidden rounded-lg border mb-4">
-                <iframe
-                  title="Mapa de ubicación del evento"
-                  src={MAP_EMBED_URL}
-                  className="w-full h-48 border-0 block"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-              </div>
+                <div className="w-full overflow-hidden rounded-lg border mb-4">
+                  <iframe
+                    title={`Mapa de ${venue.title}`}
+                    src={venue.embedUrl}
+                    className="w-full h-48 border-0 block"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
 
-              <Button asChild variant="outline" size="sm" className="w-full">
-                <a href={GOOGLE_MAPS_URL} target="_blank" rel="noopener noreferrer">
-                  Abrir en Google Maps
-                  <ExternalLink size={14} />
-                </a>
-              </Button>
-            </div>
-          </article>
+                <Button asChild variant="outline" size="sm" className="w-full">
+                  <a href={venue.mapsUrl} target="_blank" rel="noopener noreferrer">
+                    Abrir en Google Maps
+                    <ExternalLink size={14} />
+                  </a>
+                </Button>
+              </div>
+            </article>
+          ))}
 
           <div className="side-note">
             <Info />
